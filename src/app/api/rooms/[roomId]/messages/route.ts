@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
-import { canUserAccessRoom, isFixtureExpired } from "@/lib/chat";
+import { canUserAccessRoom, countLiveUsers, isFixtureExpired, markUserPresent } from "@/lib/chat";
 import { prisma } from "@/lib/prisma";
 
 const postSchema = z.object({
@@ -37,6 +37,8 @@ export async function GET(
     return NextResponse.json({ expired: true, messages: [] }, { status: 410 });
   }
 
+  await markUserPresent(roomId, user.id);
+
   const messages = await prisma.chatMessage.findMany({
     where: { roomId },
     include: {
@@ -50,7 +52,9 @@ export async function GET(
     take: 250,
   });
 
-  return NextResponse.json({ expired: false, messages });
+  const liveUserCount = await countLiveUsers(roomId);
+
+  return NextResponse.json({ expired: false, messages, liveUserCount });
 }
 
 export async function POST(
@@ -79,6 +83,8 @@ export async function POST(
   if (isFixtureExpired(room.fixture)) {
     return NextResponse.json({ error: "Chat expired" }, { status: 410 });
   }
+
+  await markUserPresent(roomId, user.id);
 
   const body = await request.json().catch(() => null);
   const parsed = postSchema.safeParse(body);

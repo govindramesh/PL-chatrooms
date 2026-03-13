@@ -44,6 +44,7 @@ model User {
   sessions       Session[]
   follows        UserFixtureFollow[]
   messages       ChatMessage[]
+  presence       ChatRoomPresence[]
   createdAt      DateTime           @default(now())
 }
 
@@ -103,6 +104,7 @@ model ChatRoom {
   team        Team?        @relation(fields: [teamId], references: [id])
   activeUntil DateTime?
   messages    ChatMessage[]
+  presence    ChatRoomPresence[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -121,6 +123,20 @@ model ChatMessage {
   createdAt   DateTime        @default(now())
 
   @@index([roomId, createdAt])
+}
+
+model ChatRoomPresence {
+  roomId     String
+  userId     String
+  room       ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@id([roomId, userId])
+  @@index([roomId, lastSeenAt])
+  @@index([userId, lastSeenAt])
 }
 
 model MatchEvent {

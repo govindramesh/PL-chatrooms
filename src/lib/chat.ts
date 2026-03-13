@@ -36,6 +36,55 @@ export function formatSystemEventBody(event: {
   return `${event.type.toUpperCase()} ${event.minute}' - ${actor}${team}`.trim();
 }
 
+const LIVE_PRESENCE_WINDOW_MS = 15_000;
+
+export function getPresenceCutoff(now = new Date()) {
+  return new Date(now.getTime() - LIVE_PRESENCE_WINDOW_MS);
+}
+
+export async function markUserPresent(roomId: string, userId: string) {
+  const now = new Date();
+
+  await prisma.chatRoomPresence.upsert({
+    where: {
+      roomId_userId: {
+        roomId,
+        userId,
+      },
+    },
+    update: {
+      lastSeenAt: now,
+    },
+    create: {
+      roomId,
+      userId,
+      lastSeenAt: now,
+    },
+  });
+}
+
+export async function countLiveUsers(roomId: string, now = new Date()) {
+  const cutoff = getPresenceCutoff(now);
+
+  await prisma.chatRoomPresence.deleteMany({
+    where: {
+      roomId,
+      lastSeenAt: {
+        lt: cutoff,
+      },
+    },
+  });
+
+  return prisma.chatRoomPresence.count({
+    where: {
+      roomId,
+      lastSeenAt: {
+        gte: cutoff,
+      },
+    },
+  });
+}
+
 export async function ensureFixtureRooms(fixtureId: string, homeTeamId: number, awayTeamId: number, activeUntil: Date) {
   const entries = [
     { key: `${fixtureId}:general`, roomType: ChatRoomType.GENERAL, teamId: null as number | null },

@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { TeamLogo } from "@/components/team-logo";
+
 type RoomSummary = {
   id: string;
   roomType: "GENERAL" | "TEAM";
   teamId: number | null;
   label: string;
+  teamName?: string;
+  teamShortName?: string;
 };
 
 type Message = {
@@ -26,14 +30,16 @@ type ChatPanelProps = {
   allowSimulateEvents: boolean;
 };
 
-async function fetchMessages(roomId: string): Promise<{ messages: Message[]; expired: boolean }> {
+async function fetchMessages(
+  roomId: string,
+): Promise<{ messages: Message[]; expired: boolean; liveUserCount: number }> {
   const response = await fetch(`/api/rooms/${roomId}/messages`, {
     method: "GET",
     cache: "no-store",
   });
 
   if (response.status === 410) {
-    return { messages: [], expired: true };
+    return { messages: [], expired: true, liveUserCount: 0 };
   }
 
   if (!response.ok) {
@@ -49,6 +55,7 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [expired, setExpired] = useState(false);
+  const [liveUserCount, setLiveUserCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const activeRoom = useMemo(
@@ -68,6 +75,7 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
         }
         setMessages(data.messages);
         setExpired(data.expired);
+        setLiveUserCount(data.liveUserCount);
         setError(null);
       } catch {
         if (!cancelled) {
@@ -131,6 +139,7 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
     const data = await fetchMessages(activeRoomId);
     setMessages(data.messages);
     setExpired(data.expired);
+    setLiveUserCount(data.liveUserCount);
   }
 
   return (
@@ -141,28 +150,38 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
             key={room.id}
             type="button"
             onClick={() => setActiveRoomId(room.id)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm ${
               room.id === activeRoomId
                 ? "bg-slate-900 text-white"
                 : "border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
+            {room.teamShortName && room.teamName ? (
+              <span className="shrink-0">
+                <TeamLogo shortName={room.teamShortName} teamName={room.teamName} />
+              </span>
+            ) : null}
             {room.label}
           </button>
         ))}
       </div>
 
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-start justify-between gap-4">
         <h3 className="text-sm font-semibold text-slate-800">{activeRoom?.label} Chat</h3>
-        {allowSimulateEvents ? (
-          <button
-            type="button"
-            onClick={() => void sendSampleEvent()}
-            className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-          >
-            Add Sample Live Event
-          </button>
-        ) : null}
+        <div className="flex flex-col items-end gap-1">
+          <p className="text-xs font-medium text-slate-500">
+            Live users: <span className="text-slate-800">{liveUserCount}</span>
+          </p>
+          {allowSimulateEvents ? (
+            <button
+              type="button"
+              onClick={() => void sendSampleEvent()}
+              className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+            >
+              Add Sample Live Event
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className="mb-2 text-sm text-rose-600">{error}</p> : null}
