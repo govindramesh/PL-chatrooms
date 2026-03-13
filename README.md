@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PL Rooms
 
-## Getting Started
+Premier League fixture chat app where each match has temporary chat rooms:
 
-First, run the development server:
+- one general room for everyone
+- one team room per club (restricted to users who selected that team at signup)
+- rooms expire one hour after the match chat expiry time
+
+## Stack
+
+- Next.js App Router + TypeScript
+- Prisma + SQLite (local dev)
+- Tailwind CSS
+- Cookie session auth
+
+## Features implemented
+
+- Signup with required favorite team selection
+- Login/logout
+- Explore page with fixtures and follow/unfollow
+- Home page that always includes favorite-team fixtures plus followed fixtures
+- Match page with:
+  - General room
+  - Team-only room access based on signup team
+  - Live event system messages inside feeds
+- Cleanup endpoint to remove expired rooms/messages
+
+## Quick start
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Initialize database and seed sample data:
+
+```bash
+npm run db:reset
+```
+
+3. Sync real Premier League fixtures from the Fantasy Premier League API:
+
+```bash
+npm run sync:fixtures
+```
+
+4. Run the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Useful scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run db:push` - apply Prisma schema
+- `npm run db:seed` - seed teams, fixtures, rooms, and sample event
+- `npm run db:reset` - reset and reseed local DB
+- `npm run sync:fixtures` - fetch and store real EPL fixtures by gameweek
+- `npm run lint` - lint the codebase
 
-## Learn More
+## API endpoints
 
-To learn more about Next.js, take a look at the following resources:
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/rooms/:roomId/messages`
+- `POST /api/rooms/:roomId/messages`
+- `POST /api/fixtures/:fixtureId/events/simulate`
+- `POST /api/jobs/cleanup`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`/api/jobs/cleanup` optionally supports `CLEANUP_TOKEN` via `x-cleanup-token` header.

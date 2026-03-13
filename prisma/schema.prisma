@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum FixtureStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+}
+
+enum ChatRoomType {
+  GENERAL
+  TEAM
+}
+
+enum ChatMessageType {
+  USER
+  SYSTEM_EVENT
+}
+
+model Team {
+  id           Int          @id
+  name         String
+  shortName    String
+  users        User[]
+  homeFixtures Fixture[]    @relation("HomeTeam")
+  awayFixtures Fixture[]    @relation("AwayTeam")
+  chatRooms    ChatRoom[]
+  eventMarkers MatchEvent[]
+}
+
+model User {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  username       String             @unique
+  passwordHash   String
+  favoriteTeamId Int
+  favoriteTeam   Team               @relation(fields: [favoriteTeamId], references: [id])
+  sessions       Session[]
+  follows        UserFixtureFollow[]
+  messages       ChatMessage[]
+  createdAt      DateTime           @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Fixture {
+  id            String             @id @default(cuid())
+  externalId    String?            @unique
+  gameweek      Int
+  kickoffAt     DateTime
+  status        FixtureStatus      @default(SCHEDULED)
+  endedAt       DateTime?
+  chatExpiresAt DateTime?
+  homeTeamId    Int
+  awayTeamId    Int
+  homeTeam      Team               @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team               @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  follows       UserFixtureFollow[]
+  rooms         ChatRoom[]
+  events        MatchEvent[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([kickoffAt])
+  @@index([gameweek])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+model UserFixtureFollow {
+  userId    String
+  fixtureId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fixture   Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, fixtureId])
+  @@index([fixtureId])
+}
+
+model ChatRoom {
+  id          String       @id @default(cuid())
+  roomKey     String       @unique
+  fixtureId   String
+  roomType    ChatRoomType
+  teamId      Int?
+  fixture     Fixture      @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  team        Team?        @relation(fields: [teamId], references: [id])
+  activeUntil DateTime?
+  messages    ChatMessage[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([fixtureId])
+  @@index([teamId])
+}
+
+model ChatMessage {
+  id          String          @id @default(cuid())
+  roomId       String
+  userId      String?
+  messageType ChatMessageType @default(USER)
+  body        String
+  room        ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+model MatchEvent {
+  id              String   @id @default(cuid())
+  fixtureId       String
+  providerEventId String
+  minute          Int
+  type            String
+  teamId          Int?
+  playerName      String?
+  fixture         Fixture  @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  team            Team?    @relation(fields: [teamId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@unique([fixtureId, providerEventId])
+  @@index([fixtureId, createdAt])
+}
