@@ -5,7 +5,7 @@ import { ChatPanel } from "@/components/chat-panel";
 import { SiteHeader } from "@/components/site-header";
 import { TeamLogo } from "@/components/team-logo";
 import { requireUser } from "@/lib/auth";
-import { canUserAccessRoom, isFixtureExpired } from "@/lib/chat";
+import { isFixtureExpired } from "@/lib/chat";
 import { formatKickoff } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 import { getFixtureScore } from "@/lib/score";
@@ -50,27 +50,27 @@ export default async function MatchPage({
     events: fixture.events,
   });
 
-  const roomSummaries = fixture.rooms
-    .filter((room) => canUserAccessRoom(room, user.favoriteTeamId))
-    .map((room) => {
-      if (room.roomType === ChatRoomType.GENERAL) {
-        return { id: room.id, roomType: room.roomType, teamId: null, label: "General" as const };
-      }
+  const generalRoom = fixture.rooms.find((room) => room.roomType === ChatRoomType.GENERAL) ?? null;
+  const supportersRoom = fixture.rooms.find(
+    (room) => room.roomType === ChatRoomType.TEAM && room.teamId === user.favoriteTeamId,
+  );
+  const selectedRoom =
+    roomFromQuery && supportersRoom && roomFromQuery === supportersRoom.id ? supportersRoom : generalRoom;
 
-      const team = room.teamId === fixture.homeTeamId ? fixture.homeTeam : fixture.awayTeam;
+  const roomSummaries = selectedRoom
+    ? [
+        {
+          id: selectedRoom.id,
+          roomType: selectedRoom.roomType,
+          teamId: selectedRoom.teamId,
+          label: selectedRoom.roomType === ChatRoomType.GENERAL ? "Match" : `${user.favoriteTeam.shortName} Fans`,
+          teamName: selectedRoom.roomType === ChatRoomType.TEAM ? user.favoriteTeam.name : undefined,
+          teamShortName: selectedRoom.roomType === ChatRoomType.TEAM ? user.favoriteTeam.shortName : undefined,
+        },
+      ]
+    : [];
 
-      return {
-        id: room.id,
-        roomType: room.roomType,
-        teamId: room.teamId,
-        label: `${team.shortName} Fans`,
-        teamName: team.name,
-        teamShortName: team.shortName,
-      };
-    });
-
-  const initialRoomId =
-    roomSummaries.find((entry) => entry.id === roomFromQuery)?.id ?? roomSummaries[0]?.id ?? "";
+  const initialRoomId = roomSummaries[0]?.id ?? "";
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -114,14 +114,11 @@ export default async function MatchPage({
             </div>
           </div>
           <p className="mt-3 text-center text-sm text-slate-600">{formatKickoff(fixture.kickoffAt)}</p>
-          <p className="mt-2 text-xs text-slate-500">
-            Team chat rooms are only visible to users who selected that team during signup.
-          </p>
         </section>
 
         {isExpired ? (
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            This fixture chat expired one hour after full-time and is no longer available.
+            This fixture chat expired 24 hours after kickoff and is no longer available.
           </section>
         ) : roomSummaries.length === 0 ? (
           <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">

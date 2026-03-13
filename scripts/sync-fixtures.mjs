@@ -57,6 +57,28 @@ function roomEntriesForFixture(fixtureId, homeTeamId, awayTeamId, activeUntil) {
   ];
 }
 
+function buildGameweekMaxKickoff(fixtures) {
+  const byGameweek = new Map();
+
+  for (const fixture of fixtures) {
+    if (!fixture.event) {
+      continue;
+    }
+
+    const kickoffAt = asDate(fixture.kickoff_time);
+    if (!kickoffAt) {
+      continue;
+    }
+
+    const existing = byGameweek.get(fixture.event);
+    if (!existing || kickoffAt.getTime() > existing.getTime()) {
+      byGameweek.set(fixture.event, kickoffAt);
+    }
+  }
+
+  return byGameweek;
+}
+
 async function sync() {
   const [bootstrapResponse, fixturesResponse] = await Promise.all([fetch(BOOTSTRAP_URL), fetch(FIXTURES_URL)]);
 
@@ -70,6 +92,14 @@ async function sync() {
 
   const bootstrap = await bootstrapResponse.json();
   const fixtures = await fixturesResponse.json();
+
+  const gameweekMaxKickoff = buildGameweekMaxKickoff(fixtures);
+  const now = new Date();
+  const expiredGameweeks = new Set(
+    [...gameweekMaxKickoff.entries()]
+      .filter(([, maxKickoff]) => plusHours(maxKickoff, 24).getTime() <= now.getTime())
+      .map(([gameweek]) => gameweek),
+  );
 
   const fplTeamById = new Map(bootstrap.teams.map((team) => [team.id, team]));
   const dbTeams = await prisma.team.findMany({
@@ -88,6 +118,10 @@ async function sync() {
     const kickoffAt = asDate(fixture.kickoff_time);
     if (!kickoffAt || !fixture.event) {
       skippedCount += 1;
+      continue;
+    }
+
+    if (expiredGameweeks.has(fixture.event)) {
       continue;
     }
 
@@ -110,7 +144,7 @@ async function sync() {
 
     const status = statusFromFixture(fixture);
     const endedAt = status === "FINISHED" ? plusHours(kickoffAt, 2) : null;
-    const chatExpiresAt = endedAt ? plusHours(endedAt, 1) : null;
+    const chatExpiresAt = plusHours(kickoffAt, 24);
 
     const upsertedFixture = await prisma.fixture.upsert({
       where: { externalId },
@@ -135,7 +169,7 @@ async function sync() {
       },
     });
 
-    const activeUntil = chatExpiresAt ?? plusHours(kickoffAt, 3);
+    const activeUntil = chatExpiresAt;
     for (const room of roomEntriesForFixture(upsertedFixture.id, homeTeamId, awayTeamId, activeUntil)) {
       await prisma.chatRoom.upsert({
         where: { roomKey: room.roomKey },
@@ -165,25 +199,16 @@ async function sync() {
 
   await prisma.fixture.deleteMany({
     where: {
-      externalId: {
-        startsWith: "fpl-",
-        notIn: [...externalIdsSeen],
-      },
-    },
-  });
-
-  const expiredDeleted = await prisma.fixture.deleteMany({
-    where: {
       OR: [
         {
-          chatExpiresAt: {
-            lte: new Date(),
+          externalId: {
+            startsWith: "fpl-",
+            notIn: [...externalIdsSeen],
           },
         },
         {
-          chatExpiresAt: null,
-          endedAt: {
-            lte: new Date(Date.now() - 60 * 60 * 1000),
+          gameweek: {
+            in: [...expiredGameweeks],
           },
         },
       ],
@@ -192,7 +217,7 @@ async function sync() {
 
   console.log(`Upserted fixtures: ${upsertedCount}`);
   console.log(`Skipped fixtures: ${skippedCount}`);
-  console.log(`Deleted expired fixtures: ${expiredDeleted.count}`);
+  console.log(`Expired gameweeks removed: ${expiredGameweeks.size}`);
   console.log(`Stored gameweeks: ${[...new Set(fixtures.map((fixture) => fixture.event).filter(Boolean))].length}`);
 }
 

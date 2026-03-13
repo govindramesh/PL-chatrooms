@@ -2,16 +2,20 @@ import { ChatMessageType, ChatRoomType, FixtureStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
-export function isFixtureExpired(fixture: { chatExpiresAt: Date | null; endedAt: Date | null }) {
+export function isFixtureExpired(fixture: { chatExpiresAt: Date | null; kickoffAt?: Date; endedAt: Date | null }) {
   if (fixture.chatExpiresAt) {
     return fixture.chatExpiresAt.getTime() <= Date.now();
+  }
+
+  if (fixture.kickoffAt) {
+    return fixture.kickoffAt.getTime() + 24 * 60 * 60 * 1000 <= Date.now();
   }
 
   if (!fixture.endedAt) {
     return false;
   }
 
-  return fixture.endedAt.getTime() + 60 * 60 * 1000 <= Date.now();
+  return fixture.endedAt.getTime() + 24 * 60 * 60 * 1000 <= Date.now();
 }
 
 export function canUserAccessRoom(

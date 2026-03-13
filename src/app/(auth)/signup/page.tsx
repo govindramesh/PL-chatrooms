@@ -23,9 +23,7 @@ export default async function SignupPage({
   return (
     <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h1 className="mb-2 text-2xl font-semibold text-slate-900">Create your PL Rooms account</h1>
-      <p className="mb-6 text-sm text-slate-600">
-        Choose one team at signup. That team decides which team chats you can access.
-      </p>
+      <p className="mb-6 text-sm text-slate-600">Select a team to join its supporters-only chat</p>
       {error ? <p className="mb-4 rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</p> : null}
       <form method="post" action="/api/auth/signup" className="space-y-3">
         <div>
@@ -78,10 +76,13 @@ export default async function SignupPage({
             <option value="" disabled>
               Select a team
             </option>
+            <option value="0">Neutral</option>
             {teams.map((team) => (
+              team.id === 0 ? null : (
               <option key={team.id} value={team.id}>
                 {team.name}
               </option>
+              )
             ))}
           </select>
         </div>

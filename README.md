@@ -4,7 +4,8 @@ Premier League fixture chat app where each match has temporary chat rooms:
 
 - one general room for everyone
 - one team room per club (restricted to users who selected that team at signup)
-- rooms expire one hour after the match chat expiry time
+- chat rooms expire 24 hours after kickoff
+- fixture tiles are removed 24 hours after the final kickoff in that gameweek
 
 ## Stack
 

@@ -8,7 +8,7 @@ const signupSchema = z.object({
   username: z.string().trim().min(3).max(24),
   email: z.string().trim().email(),
   password: z.string().min(8).max(128),
-  favoriteTeamId: z.coerce.number().int().positive(),
+  favoriteTeamId: z.coerce.number().int().nonnegative(),
 });
 
 function redirectWithError(request: NextRequest, error: string) {
@@ -31,6 +31,14 @@ export async function POST(request: NextRequest) {
   }
 
   const { username, email, password, favoriteTeamId } = parsed.data;
+
+  if (favoriteTeamId === 0) {
+    await prisma.team.upsert({
+      where: { id: 0 },
+      update: { name: "Neutral", shortName: "NEU" },
+      create: { id: 0, name: "Neutral", shortName: "NEU" },
+    });
+  }
 
   const team = await prisma.team.findUnique({ where: { id: favoriteTeamId } });
   if (!team) {

@@ -18,7 +18,7 @@ export default async function LoginPage({
   return (
     <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h1 className="mb-2 text-2xl font-semibold text-slate-900">Login to PL Rooms</h1>
-      <p className="mb-6 text-sm text-slate-600">Join match chats by your favorite Premier League team.</p>
+      <p className="mb-6 text-sm text-slate-600">Join match chats for Premier League fixtures</p>
       {error ? <p className="mb-4 rounded-md bg-rose-50 p-2 text-sm text-rose-700">{error}</p> : null}
       <form method="post" action="/api/auth/login" className="space-y-3">
         <div>

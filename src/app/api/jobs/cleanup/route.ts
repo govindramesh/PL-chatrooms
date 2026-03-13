@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 
+function plusHours(date: Date, hours: number) {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
 export async function POST(request: NextRequest) {
   const configuredToken = process.env.CLEANUP_TOKEN;
   if (configuredToken) {
@@ -12,7 +16,8 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
-  const expiredFixtures = await prisma.fixture.findMany({
+
+  const expiredChatFixtures = await prisma.fixture.findMany({
     where: {
       OR: [
         {
@@ -22,8 +27,8 @@ export async function POST(request: NextRequest) {
         },
         {
           chatExpiresAt: null,
-          endedAt: {
-            lte: new Date(now.getTime() - 60 * 60 * 1000),
+          kickoffAt: {
+            lte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
           },
         },
       ],
@@ -31,43 +36,63 @@ export async function POST(request: NextRequest) {
     select: { id: true },
   });
 
-  if (expiredFixtures.length === 0) {
-    return NextResponse.json({ ok: true, cleanedFixtures: 0, deletedMessages: 0, deletedRooms: 0, deletedFixtures: 0 });
-  }
+  const expiredChatFixtureIds = expiredChatFixtures.map((fixture) => fixture.id);
+  let deletedMessagesCount = 0;
+  let deletedRoomsCount = 0;
 
-  const fixtureIds = expiredFixtures.map((fixture) => fixture.id);
-
-  const [deletedMessages, deletedRooms, deletedFixtures] = await prisma.$transaction([
-    prisma.chatMessage.deleteMany({
-      where: {
-        room: {
-          fixtureId: {
-            in: fixtureIds,
+  if (expiredChatFixtureIds.length > 0) {
+    const [deletedMessages, deletedRooms] = await prisma.$transaction([
+      prisma.chatMessage.deleteMany({
+        where: {
+          room: {
+            fixtureId: {
+              in: expiredChatFixtureIds,
+            },
           },
         },
-      },
-    }),
-    prisma.chatRoom.deleteMany({
+      }),
+      prisma.chatRoom.deleteMany({
+        where: {
+          fixtureId: {
+            in: expiredChatFixtureIds,
+          },
+        },
+      }),
+    ]);
+
+    deletedMessagesCount = deletedMessages.count;
+    deletedRoomsCount = deletedRooms.count;
+  }
+
+  const gameweekMaxKickoff = await prisma.fixture.groupBy({
+    by: ["gameweek"],
+    _max: {
+      kickoffAt: true,
+    },
+  });
+
+  const expiredGameweeks = gameweekMaxKickoff
+    .filter((entry) => entry._max.kickoffAt && plusHours(entry._max.kickoffAt, 24).getTime() <= now.getTime())
+    .map((entry) => entry.gameweek);
+
+  let deletedFixturesCount = 0;
+  if (expiredGameweeks.length > 0) {
+    const deletedFixtures = await prisma.fixture.deleteMany({
       where: {
-        fixtureId: {
-          in: fixtureIds,
+        gameweek: {
+          in: expiredGameweeks,
         },
       },
-    }),
-    prisma.fixture.deleteMany({
-      where: {
-        id: {
-          in: fixtureIds,
-        },
-      },
-    }),
-  ]);
+    });
+
+    deletedFixturesCount = deletedFixtures.count;
+  }
 
   return NextResponse.json({
     ok: true,
-    cleanedFixtures: deletedFixtures.count,
-    deletedMessages: deletedMessages.count,
-    deletedRooms: deletedRooms.count,
-    deletedFixtures: deletedFixtures.count,
+    cleanedFixtures: deletedFixturesCount,
+    deletedMessages: deletedMessagesCount,
+    deletedRooms: deletedRoomsCount,
+    deletedFixtures: deletedFixturesCount,
   });
 }

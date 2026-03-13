@@ -3,6 +3,7 @@ import { ChatRoomType, FixtureStatus, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const teams = [
+  { id: 0, name: "Neutral", shortName: "NEU" },
   { id: 1, name: "Arsenal", shortName: "ARS" },
   { id: 2, name: "Aston Villa", shortName: "AVL" },
   { id: 3, name: "Bournemouth", shortName: "BOU" },

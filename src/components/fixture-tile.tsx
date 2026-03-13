@@ -20,6 +20,7 @@ type FixtureTileProps = {
   awayScore: number | null;
   homeTeam: TeamLite;
   awayTeam: TeamLite;
+  isExpired?: boolean;
   badges?: React.ReactNode;
   actions?: React.ReactNode;
   openLabel?: string;
@@ -46,15 +47,22 @@ export function FixtureTile({
   awayScore,
   homeTeam,
   awayTeam,
+  isExpired = false,
   badges,
   actions,
-  openLabel = "Open Match",
+  openLabel = "Open Chat",
 }: FixtureTileProps) {
   const homeBrand = getTeamBrand(homeTeam.shortName);
   const awayBrand = getTeamBrand(awayTeam.shortName);
 
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className={`relative overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
+        isExpired
+          ? "border-slate-300 opacity-65 grayscale"
+          : "border-slate-200 hover:-translate-y-0.5 hover:shadow-md"
+      }`}
+    >
       <div
         className="pointer-events-none absolute inset-0 opacity-15"
         style={{
@@ -101,7 +109,9 @@ export function FixtureTile({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Link
             href={`/match/${fixtureId}`}
-            className="inline-flex w-full items-center justify-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+            className={`inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium ${
+              isExpired ? "bg-slate-500 text-white hover:bg-slate-500" : "bg-slate-900 text-white hover:bg-slate-700"
+            }`}
           >
             {openLabel}
           </Link>

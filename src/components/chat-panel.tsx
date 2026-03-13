@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TeamLogo } from "@/components/team-logo";
 
@@ -57,14 +57,25 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
   const [expired, setExpired] = useState(false);
   const [liveUserCount, setLiveUserCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const forceScrollToBottomRef = useRef(true);
+
+  function isNearBottom(element: HTMLElement) {
+    const threshold = 48;
+    return element.scrollHeight - (element.scrollTop + element.clientHeight) <= threshold;
+  }
 
   const activeRoom = useMemo(
     () => rooms.find((room) => room.id === activeRoomId) ?? rooms[0],
     [activeRoomId, rooms],
   );
+  const showRoomSwitcher = rooms.length > 1;
 
   useEffect(() => {
     let cancelled = false;
+    shouldAutoScrollRef.current = true;
+    forceScrollToBottomRef.current = true;
 
     const load = async () => {
       try {
@@ -97,6 +108,18 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
     };
   }, [activeRoomId]);
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    if (forceScrollToBottomRef.current || shouldAutoScrollRef.current) {
+      container.scrollTop = container.scrollHeight;
+      forceScrollToBottomRef.current = false;
+    }
+  }, [messages]);
+
   async function sendMessage() {
     if (!draft.trim()) {
       return;
@@ -120,6 +143,7 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
     }
 
     setDraft("");
+    shouldAutoScrollRef.current = true;
     const result = (await response.json()) as { message: Message };
     setMessages((prev) => [...prev, result.message]);
   }
@@ -144,30 +168,32 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap gap-2">
-        {rooms.map((room) => (
-          <button
-            key={room.id}
-            type="button"
-            onClick={() => setActiveRoomId(room.id)}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm ${
-              room.id === activeRoomId
-                ? "bg-slate-900 text-white"
-                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {room.teamShortName && room.teamName ? (
-              <span className="shrink-0">
-                <TeamLogo shortName={room.teamShortName} teamName={room.teamName} />
-              </span>
-            ) : null}
-            {room.label}
-          </button>
-        ))}
-      </div>
+      {showRoomSwitcher ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {rooms.map((room) => (
+            <button
+              key={room.id}
+              type="button"
+              onClick={() => setActiveRoomId(room.id)}
+              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm ${
+                room.id === activeRoomId
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {room.teamShortName && room.teamName ? (
+                <span className="shrink-0">
+                  <TeamLogo shortName={room.teamShortName} teamName={room.teamName} />
+                </span>
+              ) : null}
+              {room.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="mb-2 flex items-start justify-between gap-4">
-        <h3 className="text-sm font-semibold text-slate-800">{activeRoom?.label} Chat</h3>
+        <h3 className="text-sm font-semibold text-slate-800">{showRoomSwitcher ? `${activeRoom?.label} Chat` : "Chat"}</h3>
         <div className="flex flex-col items-end gap-1">
           <p className="text-xs font-medium text-slate-500">
             Live users: <span className="text-slate-800">{liveUserCount}</span>
@@ -186,7 +212,13 @@ export function ChatPanel({ rooms, fixtureId, initialRoomId, allowSimulateEvents
 
       {error ? <p className="mb-2 text-sm text-rose-600">{error}</p> : null}
 
-      <div className="h-96 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
+      <div
+        ref={scrollContainerRef}
+        onScroll={(event) => {
+          shouldAutoScrollRef.current = isNearBottom(event.currentTarget);
+        }}
+        className="h-96 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3"
+      >
         {loading ? <p className="text-sm text-slate-500">Loading chat...</p> : null}
         {!loading && messages.length === 0 ? (
           <p className="text-sm text-slate-500">No messages yet. Start the conversation.</p>
